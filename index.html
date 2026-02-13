@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Darkwing Duck - Let's Get Dangerous!</title>
+<meta name="description" content="A side-scrolling platformer featuring the terror that flaps in the night!">
+<meta name="theme-color" content="#7b2ff7">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Darkwing Duck">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.svg">
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
@@ -1578,16 +1586,30 @@ function drawTitle() {
   
   drawDarkwing(canvas.width/2,canvas.height*0.52,1,Math.floor(t*5)%40,false,0,0,0);
   
-  if(Math.sin(t*3)>0){ctx.fillStyle='#fff';ctx.font='bold 22px "Segoe UI"';ctx.fillText('CLICK TO START',canvas.width/2,canvas.height*0.72);}
+  const save = loadGame();
+  if(Math.sin(t*3)>0){ctx.fillStyle='#fff';ctx.font='bold 22px "Segoe UI"';ctx.fillText('CLICK TO START',canvas.width/2,canvas.height*0.68);}
+  if(save && save.bestLevel > 0){
+    ctx.fillStyle='#c471f5';ctx.font='16px "Segoe UI"';
+    ctx.fillText(`Best: Level ${save.bestLevel+1} — Press C to continue`,canvas.width/2,canvas.height*0.74);
+  }
   ctx.fillStyle='#8888aa';ctx.font='14px "Segoe UI"';
   ctx.fillText('Arrow Keys / WASD — Move & Jump  |  Click — Shoot  |  1-4 — Call Allies',canvas.width/2,canvas.height*0.82);
   ctx.fillText('Friends drop in and fight alongside you! Collect pickups for boosts!',canvas.width/2,canvas.height*0.87);
   ctx.fillStyle='#555';ctx.font='11px "Segoe UI"';ctx.fillText("A fan tribute to Disney's Darkwing Duck",canvas.width/2,canvas.height*0.95);
   ctx.textAlign='left';
   
-  if(mouse.clicked){ensureAudio();playSound('select');
-    stats.lives=3;stats.maxHP=100;stats.damage=15;stats.speed=4.5;stats.cooldownMult=1.0;stats.level=1;
-    COMPANIONS.forEach(a=>a.timer=0);loadLevel(0);}
+  if(mouse.clicked||keys['KeyC']){
+    ensureAudio();playSound('select');
+    const continuing = keys['KeyC'] && save && save.bestLevel > 0;
+    if(continuing){
+      stats.lives=save.stats.lives||3;stats.maxHP=save.stats.maxHP||100;stats.damage=save.stats.damage||15;
+      stats.speed=save.stats.speed||4.5;stats.cooldownMult=save.stats.cooldownMult||1.0;stats.level=save.stats.level||1;
+      COMPANIONS.forEach(a=>a.timer=0);loadLevel(save.bestLevel);
+    } else {
+      stats.lives=3;stats.maxHP=100;stats.damage=15;stats.speed=4.5;stats.cooldownMult=1.0;stats.level=1;
+      COMPANIONS.forEach(a=>a.timer=0);loadLevel(0);
+    }
+  }
 }
 
 function drawLevelIntro() {
@@ -1903,6 +1925,71 @@ function gameLoop() {
   mouse.clicked=false;requestAnimationFrame(gameLoop);
 }
 
+// ============================================================
+// SAVE SYSTEM (localStorage)
+// ============================================================
+const SAVE_KEY = 'darkwing_save';
+
+function saveGame() {
+  try {
+    const data = {
+      version: 2,
+      stats: { ...stats },
+      companions: COMPANIONS.map(c => ({ timer: 0 })), // reset cooldowns on load
+      bestLevel: Math.max(stats.currentLevel, loadBestLevel()),
+      timestamp: Date.now()
+    };
+    localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+  } catch(e) {}
+}
+
+function loadBestLevel() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return 0;
+    const data = JSON.parse(raw);
+    return data.bestLevel || 0;
+  } catch(e) { return 0; }
+}
+
+function loadGame() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return false;
+    const data = JSON.parse(raw);
+    if (data.version !== 2) return false;
+    return data;
+  } catch(e) { return false; }
+}
+
+function clearSave() {
+  try { localStorage.removeItem(SAVE_KEY); } catch(e) {}
+}
+
+// Auto-save after each level complete
+const origConfirmUpgrade = confirmUpgrade;
+confirmUpgrade = function() {
+  origConfirmUpgrade();
+  saveGame();
+};
+
+// Save on win
+const origDrawWin = drawWin;
+drawWin = function() {
+  if (stateTimer === 1) saveGame();
+  origDrawWin();
+};
+
+// ============================================================
+// SERVICE WORKER
+// ============================================================
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+
+// ============================================================
+// BOOT
+// ============================================================
 document.getElementById('loadBar').style.width='100%';
 setTimeout(()=>{document.getElementById('loading').style.display='none';gameLoop();},500);
 </script>
