@@ -62,30 +62,25 @@ const imageManifest = {
   victory: { prompt: "celebration fireworks over cartoon city at night purple and gold triumphant 90s cartoon style", w: 800, h: 450 },
 };
 
-function pollinationsUrl(prompt, w, h) {
-  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=${w}&height=${h}&nologo=true&seed=42`;
-}
-
 function loadImages() {
   return new Promise(resolve => {
-    const entries = Object.entries(imageManifest);
+    const keys = Object.keys(imageManifest);
     let loaded = 0;
     const bar = document.getElementById('loadBar');
     const status = document.getElementById('loadStatus');
-    entries.forEach(([key, spec]) => {
+    keys.forEach(key => {
       const img = new Image();
-      img.crossOrigin = 'anonymous';
       img.onload = () => { IMG[key] = img; done(); };
       img.onerror = () => { done(); };
-      img.src = pollinationsUrl(spec.prompt, spec.w, spec.h);
+      img.src = `assets/${key}.png`;
     });
     function done() {
       loaded++;
-      bar.style.width = Math.round(loaded/entries.length*100) + '%';
-      status.textContent = `Loading assets... (${loaded}/${entries.length})`;
-      if (loaded >= entries.length) resolve();
+      bar.style.width = Math.round(loaded/keys.length*100) + '%';
+      status.textContent = `Loading assets... (${loaded}/${keys.length})`;
+      if (loaded >= keys.length) resolve();
     }
-    setTimeout(resolve, 20000); // 20s max wait
+    setTimeout(resolve, 5000); // 5s max wait (local assets load fast)
   });
 }
 
